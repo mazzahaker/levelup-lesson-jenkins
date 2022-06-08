@@ -1,0 +1,48 @@
+pipeline {
+    agent {
+     label 'linux'
+    }
+
+    options {
+     ansiColor('xterm')
+     timestamps()
+    }
+
+    parameters {
+     string(name: 'vc_hostname', defaultValue: 'vc7.cources.local', description: 'Hostname or IP of VCSA')
+     string(name: 'vc_username', defaultValue: 'administrator@vsphere.local', description: 'Username of VCSA')
+     string(name: 'ova_folder', defaultValue: 'Datacenter', description: 'Folder of VCSA')
+     password(name: 'vc_password', defaultValue: 'TYPEPASSWORD', description: 'Enter a password')
+    }
+
+    stages {
+        stage('Configuring vars-file for deployment') {
+            steps {
+                sh 'rm /test/vars.yml '
+                sh 'echo "---" >> /test/vars.yml'
+                sh 'echo "   vc:" >> /test/vars.yml'
+                sh 'echo "     hostname: $vc_hostname" >> /test/vars.yml'
+                sh 'echo "     username: $vc_username" >> /test/vars.yml'
+                sh 'echo "     password: $vc_password" >> /test/vars.yml'
+                sh 'echo "    " >> /test/vars.yml'
+                sh 'echo "   ova:" >> /test/vars.yml'
+                sh 'echo "     datacenter: $ova_folder" >> /test/vars.yml'
+            }
+        }
+        stage('Printing generated file') {
+            steps {
+              sh 'cat /test/vars.yml'
+            }
+        }
+        stage('Installing requirements') {
+            steps {
+                sh 'ansible-galaxy collection install -r /test/requirements.yml --ignore-cert'
+            }
+        }
+        stage('Getting VMs from the server inside VCSA') {
+            steps {
+                sh 'ansible-playbook /test/playbook1.yml'
+            }
+        }
+    }
+}
