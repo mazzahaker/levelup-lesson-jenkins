@@ -1,0 +1,213 @@
+pipeline {
+    agent { label 'linux' }
+	options {
+		  ansiColor('xterm')
+	}
+	stages {
+		stage ('Parameters') {
+			steps {
+				script {
+					properties([
+						parameters ([
+							string(name: 'vc_hostname', defaultValue: 'cmo-csr-vcsa.cmo-csr.com', description: 'Hostname or IP of VCSA'),
+							string(name: 'vc_username', defaultValue: 'administrator@cmo-csr.local', description: 'Username of VCSA'),
+							string(name: 'vc_password', defaultValue: 'VMwar3!!', description: 'Enter a password'),
+							string(name: 'ova_local_path', defaultValue: '/root/ovas/', description: 'OVAs folder'),
+							choice(name: 'ova_name', choices: ['rhel85-template.ova', 'rhel90-template.ova', 'sles15sp3-template.ova', 'ubuntu18.04-template.ova', 'ubuntu20.04-template.ova', 'ubuntu22.04-template.ova'], description: 'The name of OVA file'),
+							string(name: 'ova_datacenter', defaultValue: 'CMO-CICD', description: 'Datacenter inside VCSA for template and VMs'),
+							string(name: 'ova_cluster', defaultValue: 'CICD-Prod', description: 'Cluster inside VCSA for template and VMs'),
+							string(name: 'ova_datastore', defaultValue: 'vsanDatastore', description: 'The Datastore where will stored your VMs'),
+							string(name: 'ova_folder', defaultValue: 'testenv123', description: 'The folder where will stored your VMs'),							
+							string(name: 'atlantic_folder', defaultValue: '/root/atlantic_distro/', description: 'Local path on the Ansible node for downloaded Atlantic distro'),
+							string(name: 'atlantic_link', defaultValue: 'https://asdrepo.isus.emc.com/artifactory/atlantic-build/com/emc/atlantic/release/1.1.0/', description: 'Version of Atlantic, which will be installed'),							
+							string(name: 'atlantic_flags', defaultValue: '', description: 'Some flags for installation e.g. -e enable_istio=true'),
+							string(name: 'srv_user', defaultValue: 'root', description: 'Creds for the OS (OVA already has these creds)'),
+							string(name: 'srv_password', defaultValue: 'password', description: 'The default password: password'),
+							string(name: 'srv_work_folder', defaultValue: '/root/autoVMs/', description: 'Creds for the OS (OVA already has these creds)'),
+							string(name: 'srv_cpu', defaultValue: '8', description: 'The number of CPUs for VMs'),
+							string(name: 'srv_ram', defaultValue: '8196', description: 'The RAM for VM in Mb'),
+							string(name: 'srv_netmask', defaultValue: '255.255.255.128', description: 'Netmask of VMs'),
+							string(name: 'srv_gateway', defaultValue: '100.80.9.126', description: 'Gateway of VMs'),
+							string(name: 'srv_nameserver', defaultValue: '10.125.125.236', description: 'DNS of VMs'),
+							string(name: 'srv_networkName', defaultValue: 'cmo-1172-l3', description: 'Name of the network adapter, which will be attached'),
+							string(name: 'srv_networkDataName', defaultValue: 'vsan-10', description: 'Name of the network adapter, which will be attached'),
+							string(name: 'srv_type', defaultValue: 'ssh', description: 'Type of connection'),							
+							string(name: 'srv1_ip', defaultValue: '100.80.9.52', description: 'IP of the first machine'),
+							string(name: 'srv1_data', defaultValue: '172.16.9.52', description: 'Additional adapter IP of the first machine'),
+							[$class: 'ChoiceParameter', choiceType: 'PT_SINGLE_SELECT', filterLength: 1, filterable: false, name: 'srv1_physical', randomName: 'choice-parameter-18045874293398', script: [$class: 'GroovyScript', fallbackScript: [classpath: [], oldScript: '', sandbox: false, script: ''], script: [classpath: [], oldScript: '', sandbox: false, script: 'return [\'VM\', \'SRV\']']]],
+[$class: 'DynamicReferenceParameter', choiceType: 'ET_FORMATTED_HTML', name: 'srv1_parameters', omitValueField: false, randomName: 'choice-parameter-18045876230195', referencedParameters: 'srv1_physical', script: [$class: 'GroovyScript', fallbackScript: [classpath: [], oldScript: '', sandbox: false, script: ''], script: [classpath: [], oldScript: '', sandbox: false, script: '''service_tier_map = [
+  "SRV": [
+    ["service_name": "iDRAC", "tag": "10.125.127.21" ],
+    ["service_name": "vlan", "tag": "102" ],
+    ["service_name": "username", "tag": "root" ],
+    ["service_name": "password", "tag": "calvin" ],
+    ["service_name": "First adapter", "tag": "em1" ],
+    ["service_name": "Second adapter", "tag": "em2" ],
+  ],
+  "VM": [
+    ["service_name": "Skip it", "release_tag": "2.1.0" ],
+  ],
+]
+
+html_to_be_rendered = "<table><tr>"
+service_list = service_tier_map[srv1_physical]
+service_list.each { service ->
+  html_to_be_rendered = """
+    ${html_to_be_rendered}
+    <tr>
+    <td>
+    <label title=\\"${service.service_name}\\" class=\\" \\">${service.service_name}</label>
+    </td>
+    <td>
+    <input type=\\"text\\" class=\\" \\" name=\\"value\\" value=\\"${service.tag}\\"> </br>
+    </td>
+    </tr>
+"""
+}
+
+
+html_to_be_rendered = "${html_to_be_rendered}</tr></table>"
+
+return html_to_be_rendered''']]],
+							string(name: 'manager_srv_ip', defaultValue: '100.80.9.55', description: 'IP of the third machine'),
+							string(name: 'manager_srv_data', defaultValue: '172.16.9.55', description: 'Additional adapter IP of the third machine'),
+							[$class: 'ChoiceParameter', choiceType: 'PT_SINGLE_SELECT', filterLength: 1, filterable: false, name: 'managersrv_physical', randomName: 'choice-parameter-18474292296949', script: [$class: 'GroovyScript', fallbackScript: [classpath: [], oldScript: '', sandbox: false, script: ''], script: [classpath: [], oldScript: '', sandbox: false, script: 'return [\'VM\', \'SRV\']']]],
+[$class: 'DynamicReferenceParameter', choiceType: 'ET_FORMATTED_HTML', name: 'managersrv_parameters', omitValueField: false, randomName: 'choice-parameter-18474303946352', referencedParameters: 'managersrv_physical', script: [$class: 'GroovyScript', fallbackScript: [classpath: [], oldScript: '', sandbox: false, script: ''], script: [classpath: [], oldScript: '', sandbox: false, script: '''service_tier_map = [
+  "SRV": [
+    ["service_name": "iDRAC", "tag": "10.125.127.21" ],
+    ["service_name": "vlan", "tag": "102" ],
+    ["service_name": "username", "tag": "root" ],
+    ["service_name": "password", "tag": "calvin" ],
+    ["service_name": "First adapter", "tag": "em1" ],
+    ["service_name": "Second adapter", "tag": "em2" ],
+  ],
+  "VM": [
+    ["service_name": "Skip it", "release_tag": "2.1.0" ],
+  ],
+]
+
+html_to_be_rendered = "<table><tr>"
+service_list = service_tier_map[managersrv_physical]
+service_list.each { service ->
+  html_to_be_rendered = """
+    ${html_to_be_rendered}
+    <tr>
+    <td>
+    <label title=\\"${service.service_name}\\" class=\\" \\">${service.service_name}</label>
+    </td>
+    <td>
+    <input type=\\"text\\" class=\\" \\" name=\\"value\\" value=\\"${service.tag}\\"> </br>
+    </td>
+    </tr>
+"""
+}
+
+
+html_to_be_rendered = "${html_to_be_rendered}</tr></table>"
+
+return html_to_be_rendered''']]],
+							])
+						])
+					}
+				}
+			}
+		stage('Configuring vars-file for deployment') {
+            steps {
+                sh 'rm /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "---" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   vc:" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     hostname: $vc_hostname" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     username: $vc_username" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     password: $vc_password" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   " >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   ova:" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     local_path: $ova_local_path" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     name: $ova_name" >> /root/autoVMs/playbooks/vars.yml'
+                sh """echo "     template: $ova_name"  | awk -F '.' '{print \$1}' >> /root/autoVMs/playbooks/vars.yml"""
+                sh 'echo "     datacenter: $ova_datacenter" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     cluster: $ova_cluster" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     datastore: $ova_datastore" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     folder: $ova_folder" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   " >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   atlantic:" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     folder: $atlantic_folder" >> /root/autoVMs/playbooks/vars.yml'
+                sh """echo "     tree: $atlantic_link"  | cut -d '/' -f 9  | sed 's/^/     tree: /g' >> /root/autoVMs/playbooks/vars.yml"""
+                sh """echo "     version: $atlantic_link"  | cut -d '/' -f 10  | sed 's/^/     version: /g' >> /root/autoVMs/playbooks/vars.yml"""
+		sh 'echo "     flags: $atlantic_flags" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   " >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   srv:" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     user: $srv_user" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     password: $srv_password" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     work_folder: $srv_work_folder" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     cpu: $srv_cpu" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     ram: $srv_ram" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     netmask: $srv_netmask" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     gateway: $srv_gateway" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     nameserver: $srv_nameserver" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     networkName: $srv_networkName" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     networkDataName: $srv_networkDataName" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     type: $srv_type" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   " >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "     srv1:" >> /root/autoVMs/playbooks/vars.yml'
+				sh """echo "       name: $ova_name"   | awk -F '-' '{print \$1}'| sed 's/.*/&-vm1-${currentBuild.number}/' >> /root/autoVMs/playbooks/vars.yml"""
+                sh 'echo "       ip: $srv1_ip" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "       data: $srv1_data" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   " >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "       physical: $srv1_physical" >> /root/autoVMs/playbooks/vars.yml'
+                sh """if [ "$srv1_physical" = "SRV" ]; then echo "       iDRAC: ${srv1_parameters}"   | awk -F ',' '{print \$1}' >> /root/autoVMs/playbooks/vars.yml; fi"""
+                sh """if [ "$srv1_physical" = "SRV" ]; then echo "       vlan: ${srv1_parameters}"  | sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       vlan: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$srv1_physical" = "SRV" ]; then echo "       username: ${srv1_parameters}"  | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       username: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$srv1_physical" = "SRV" ]; then echo "       password: ${srv1_parameters}"  | sed 's/^[^,]*,//' | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       password: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$srv1_physical" = "SRV" ]; then echo "       adaptername: ${srv1_parameters}"  | sed 's/^[^,]*,//' | sed 's/^[^,]*,//' | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       adaptername: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$srv1_physical" = "SRV" ]; then echo "       dataadaptername: ${srv1_parameters}"  | sed 's/^[^,]*,//' | sed 's/^[^,]*,//' | sed 's/^[^,]*,//' | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       dataadaptername: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+                sh 'echo "   " >> /root/autoVMs/playbooks/vars.yml'
+
+                sh 'echo "     manager_srv:" >> /root/autoVMs/playbooks/vars.yml'
+				sh """echo "       name: $ova_name"   | awk -F '-' '{print \$1}'| sed 's/.*/&-manager-${currentBuild.number}/' >> /root/autoVMs/playbooks/vars.yml"""
+                sh 'echo "       ip: $manager_srv_ip" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "       data: $manager_srv_data" >> /root/autoVMs/playbooks/vars.yml'
+                sh 'echo "   " >> /root/autoVMs/playbooks/vars.yml'
+				sh 'echo "       physical: $managersrv_physical" >> /root/autoVMs/playbooks/vars.yml'
+                sh """if [ "$managersrv_physical" = "SRV" ]; then echo "       iDRAC: ${managersrv_parameters}"   | awk -F ',' '{print \$1}' >> /root/autoVMs/playbooks/vars.yml; fi"""
+                sh """if [ "$managersrv_physical" = "SRV" ]; then echo "       vlan: ${managersrv_parameters}"  | sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       vlan: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$managersrv_physical" = "SRV" ]; then echo "       username: ${managersrv_parameters}"  | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       username: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$managersrv_physical" = "SRV" ]; then echo "       password: ${managersrv_parameters}"  | sed 's/^[^,]*,//' | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       password: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$managersrv_physical" = "SRV" ]; then echo "       adaptername: ${managersrv_parameters}"  | sed 's/^[^,]*,//' | sed 's/^[^,]*,//' | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       adaptername: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+				sh """if [ "$managersrv_physical" = "SRV" ]; then echo "       dataadaptername: ${managersrv_parameters}"  | sed 's/^[^,]*,//' | sed 's/^[^,]*,//' | sed 's/^[^,]*,//' | sed 's/^[^,]*,//'| sed 's/^[^,]*,//'  | awk -F ',' '{print \$1}' | sed 's/^/       dataadaptername: /g' >> /root/autoVMs/playbooks/vars.yml; fi"""
+            }
+		}
+		
+		stage('Downloading files locally'){
+			steps{
+				ansiblePlaybook colorized: true, disableHostKeyChecking: true, playbook: '/root/autoVMs/playbooks/check.yml'			  
+			}
+		}
+		stage('Deploy VMs for Atlantic'){
+			steps{
+				ansiblePlaybook colorized: true, disableHostKeyChecking: true, playbook: '/root/autoVMs/playbooks/playbooks-1-node/deployVMs.yml'			  
+			}
+		}
+		stage('Configure VMs'){
+			steps{
+				ansiblePlaybook colorized: true, disableHostKeyChecking: true, inventory: '/root/autoVMs/inventory/hosts', playbook: '/root/autoVMs/playbooks/configureVMs.yml'
+				ansiblePlaybook colorized: true, disableHostKeyChecking: true, inventory: '/root/autoVMs/inventory/hosts', playbook: '/root/autoVMs/playbooks/playbooks-1-node/installation_ssh.yml'
+				ansiblePlaybook colorized: true, disableHostKeyChecking: true, inventory: '/root/autoVMs/inventory/hosts', playbook: '/root/autoVMs/playbooks/installationNodes.yml'
+		  }
+		}
+		stage('Install packages and Atlantic'){
+			steps{
+				ansiblePlaybook colorized: true, disableHostKeyChecking: true, inventory: '/root/autoVMs/inventory/hosts', playbook: '/root/autoVMs/playbooks/playbooks-1-node/preparingManageNode.yml'
+			}
+		}
+		stage('Removing installation node'){
+			steps{
+				ansiblePlaybook colorized: true, disableHostKeyChecking: true, inventory: '/root/autoVMs/inventory/hosts', playbook: '/root/autoVMs/playbooks/removeManage.yml'
+			}
+		}
+	}
+	post {
+		success {
+			echo "SUCCESS"
+		}
+	}
+}
